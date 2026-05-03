@@ -20,4 +20,17 @@ export class TenantService {
     verifyElevenLabsSignature(req, context.webhookSecret);
     return context;
   }
+
+  async resolveFromInitiationRequest(req: Request): Promise<TenantContext> {
+    const body = req.body as { agent_id?: unknown; provider_agent_id?: unknown };
+    const providerAgentId = body.provider_agent_id ?? body.agent_id;
+
+    if (!providerAgentId || typeof providerAgentId !== 'string') {
+      throw badRequest('agent_id is required');
+    }
+
+    const context = await tenantRepository.findByProviderAgentId(providerAgentId);
+    verifyElevenLabsSignature(req, context.webhookSecret);
+    return context;
+  }
 }

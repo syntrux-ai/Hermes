@@ -247,6 +247,21 @@ export class BookingRepository {
     return data ?? [];
   }
 
+  async findRecentBookingsByPhone(context: TenantContext, clientPhone: string, limit = 5) {
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('*, services!inner(name), resources!inner(name)')
+      .eq('organization_id', context.organizationId)
+      .eq('location_id', context.locationId)
+      .eq('client_phone', normalizePhone(clientPhone))
+      .order('booking_date', { ascending: false })
+      .order('start_time', { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+    return data ?? [];
+  }
+
   async findBookingById(context: TenantContext, bookingId: string): Promise<BookingRecord & { services: ServiceRecord; resources: ResourceRecord }> {
     const { data, error } = await supabase
       .from('bookings')

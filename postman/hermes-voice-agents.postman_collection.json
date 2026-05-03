@@ -6,6 +6,44 @@
   },
   "item": [
     {
+      "name": "00 Init Client Data",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "x-hermes-secret",
+            "value": "replace-this-secret"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"agent_id\": \"{{providerAgentId}}\",\n  \"caller_id\": \"{{clientPhone}}\",\n  \"called_number\": \"+912212345678\",\n  \"call_sid\": \"postman_call_123\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/voice-agents/init-client-data",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "voice-agents", "init-client-data"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('init client data returns 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('returns dynamic variables', function () { pm.expect(body.type).to.eql('conversation_initiation_client_data'); pm.expect(body.dynamic_variables).to.be.an('object'); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
       "name": "01 Health",
       "request": {
         "method": "GET",

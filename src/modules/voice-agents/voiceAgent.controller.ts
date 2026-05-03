@@ -5,12 +5,14 @@ import { AuditService } from './audit.service.js';
 import { ToolRouter } from './toolRouter.js';
 import type { VoiceToolName } from './tool.types.js';
 import { VoiceAgentService } from './voiceAgent.service.js';
+import { InitClientDataService } from './initClientData.service.js';
 
 export class VoiceAgentController {
   constructor(
     private readonly voiceAgentService = new VoiceAgentService(),
     private readonly toolRouter = new ToolRouter(),
     private readonly audit = new AuditService(),
+    private readonly initClientData = new InitClientDataService(),
   ) {}
 
   handleTool(toolName: VoiceToolName) {
@@ -52,6 +54,13 @@ export class VoiceAgentController {
 
         throw error;
       }
+    };
+  }
+
+  handleInitClientData() {
+    return async (req: Request, res: Response) => {
+      const response = await this.initClientData.buildResponse(req);
+      res.json(response);
     };
   }
 }

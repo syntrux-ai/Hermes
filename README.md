@@ -15,6 +15,7 @@ POST /api/voice-agents/tools/create-booking
 POST /api/voice-agents/tools/find-bookings
 POST /api/voice-agents/tools/cancel-booking
 POST /api/voice-agents/tools/reschedule-booking
+POST /api/voice-agents/init-client-data
 ```
 
 Each request must include `provider_agent_id` so Hermes can resolve the organization, location, vertical, and webhook secret.
@@ -103,4 +104,44 @@ POST /api/voice-agents/tools/create-booking
 POST /api/voice-agents/tools/find-bookings
 POST /api/voice-agents/tools/reschedule-booking
 POST /api/voice-agents/tools/cancel-booking
+POST /api/voice-agents/init-client-data
+```
+
+## ElevenLabs Initiation Client Data Webhook
+
+Configure this URL in ElevenLabs for Conversation Initiation Client Data:
+
+```txt
+https://<your-vercel-domain>/api/voice-agents/init-client-data
+```
+
+Headers:
+
+```txt
+Content-Type: application/json
+x-hermes-secret: <voice_agents.webhook_secret>
+```
+
+Expected ElevenLabs-style body:
+
+```json
+{
+  "agent_id": "agent_...",
+  "caller_id": "+919820011234",
+  "called_number": "+91...",
+  "call_sid": "..."
+}
+```
+
+Hermes returns dynamic variables:
+
+```txt
+customer_name
+customer_phone
+is_existing_customer
+upcoming_booking_summary
+last_service
+preferred_technician
+salon_name
+location_name
 ```

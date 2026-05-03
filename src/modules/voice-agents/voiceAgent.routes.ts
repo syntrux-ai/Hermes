@@ -5,6 +5,7 @@ import { VoiceAgentController } from './voiceAgent.controller.js';
 const router = Router();
 const controller = new VoiceAgentController();
 
+router.post('/init-client-data', asyncHandler(controller.handleInitClientData()));
 router.post('/tools/check-availability', asyncHandler(controller.handleTool('check-availability')));
 router.post('/tools/create-booking', asyncHandler(controller.handleTool('create-booking')));
 router.post('/tools/find-bookings', asyncHandler(controller.handleTool('find-bookings')));
