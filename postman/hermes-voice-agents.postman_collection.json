@@ -1,0 +1,320 @@
+{
+  "info": {
+    "name": "Hermes Voice Agents",
+    "description": "End-to-end Postman tests for Hermes voice-agent booking tools. Run requests in order after applying Supabase migrations and starting the local API.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "01 Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "health"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('health returns 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('service is hermes', function () { pm.expect(pm.response.json().service).to.eql('hermes'); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 Check Availability - No Technician Preference",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"provider_agent_id\": \"{{providerAgentId}}\",\n  \"service_name\": \"{{serviceName}}\",\n  \"date\": \"{{bookingDate}}\",\n  \"time_preference\": \"{{timePreference}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/voice-agents/tools/check-availability",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "voice-agents", "tools", "check-availability"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('availability returns 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('availability response has slots', function () { pm.expect(body.slots.length, JSON.stringify(body)).to.be.greaterThan(0); });",
+              "const selected = body.auto_assign_recommended || body.slots[0];",
+              "pm.environment.set('selectedStartTime', selected.start_time);",
+              "pm.environment.set('selectedResourceName', selected.resource_name);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 Check Availability - Preferred Technician",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"provider_agent_id\": \"{{providerAgentId}}\",\n  \"service_name\": \"{{serviceName}}\",\n  \"date\": \"{{bookingDate}}\",\n  \"time_preference\": \"{{timePreference}}\",\n  \"technician_name\": \"{{preferredTechnician}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/voice-agents/tools/check-availability",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "voice-agents", "tools", "check-availability"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('preferred availability returns 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('preferred technician field is present when requested', function () { pm.expect(body).to.have.property('preferred_resource_name'); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 Create Booking",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"provider_agent_id\": \"{{providerAgentId}}\",\n  \"client_name\": \"{{clientName}}\",\n  \"client_phone\": \"{{clientPhone}}\",\n  \"service_name\": \"{{serviceName}}\",\n  \"date\": \"{{bookingDate}}\",\n  \"start_time\": \"{{selectedStartTime}}\",\n  \"resource_name\": \"{{selectedResourceName}}\",\n  \"notes\": \"Postman endpoint test booking\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/voice-agents/tools/create-booking",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "voice-agents", "tools", "create-booking"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('create booking returns 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('booking was created', function () { pm.expect(body.success).to.eql(true); pm.expect(body.booking_id).to.be.a('string'); });",
+              "pm.environment.set('bookingId', body.booking_id);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 Find Confirmed Bookings",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"provider_agent_id\": \"{{providerAgentId}}\",\n  \"client_phone\": \"{{clientPhone}}\",\n  \"status\": \"confirmed\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/voice-agents/tools/find-bookings",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "voice-agents", "tools", "find-bookings"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('find bookings returns 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('created booking is returned', function () {",
+              "  const bookingId = pm.environment.get('bookingId');",
+              "  pm.expect(body.bookings.some((booking) => booking.booking_id === bookingId)).to.eql(true);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 Check Availability - Reschedule Target",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"provider_agent_id\": \"{{providerAgentId}}\",\n  \"service_name\": \"{{serviceName}}\",\n  \"date\": \"{{rescheduleDate}}\",\n  \"time_preference\": \"{{timePreference}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/voice-agents/tools/check-availability",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "voice-agents", "tools", "check-availability"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('reschedule availability returns 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('reschedule target has slots', function () { pm.expect(body.slots.length, JSON.stringify(body)).to.be.greaterThan(0); });",
+              "const selected = body.auto_assign_recommended || body.slots[0];",
+              "pm.environment.set('rescheduleStartTime', selected.start_time);",
+              "pm.environment.set('rescheduleResourceName', selected.resource_name);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 Reschedule Booking",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"provider_agent_id\": \"{{providerAgentId}}\",\n  \"booking_id\": \"{{bookingId}}\",\n  \"client_phone\": \"{{clientPhone}}\",\n  \"new_date\": \"{{rescheduleDate}}\",\n  \"new_start_time\": \"{{rescheduleStartTime}}\",\n  \"resource_name\": \"{{rescheduleResourceName}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/voice-agents/tools/reschedule-booking",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "voice-agents", "tools", "reschedule-booking"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('reschedule returns 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('booking was rescheduled', function () { pm.expect(body.success).to.eql(true); pm.expect(body.booking_id).to.eql(pm.environment.get('bookingId')); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 Cancel Booking",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"provider_agent_id\": \"{{providerAgentId}}\",\n  \"booking_id\": \"{{bookingId}}\",\n  \"client_phone\": \"{{clientPhone}}\",\n  \"cancellation_reason\": \"Postman endpoint test complete\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/voice-agents/tools/cancel-booking",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "voice-agents", "tools", "cancel-booking"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('cancel returns 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('booking was cancelled', function () { pm.expect(body.success).to.eql(true); pm.expect(body.booking_id).to.eql(pm.environment.get('bookingId')); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 Find All Bookings",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"provider_agent_id\": \"{{providerAgentId}}\",\n  \"client_phone\": \"{{clientPhone}}\",\n  \"status\": \"all\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/voice-agents/tools/find-bookings",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "voice-agents", "tools", "find-bookings"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('find all returns 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('cancelled booking is visible in all results', function () {",
+              "  const bookingId = pm.environment.get('bookingId');",
+              "  const booking = body.bookings.find((item) => item.booking_id === bookingId);",
+              "  pm.expect(booking).to.not.eql(undefined);",
+              "  pm.expect(booking.status).to.eql('cancelled');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    }
+  ]
+}
