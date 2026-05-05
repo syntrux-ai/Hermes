@@ -45,7 +45,7 @@ export class ToolRouter {
           serviceId: optionalString(body.service_id),
           serviceName: optionalString(body.service_name) ?? optionalString(body.service),
           date: requiredString(body.date, 'date'),
-          startTime: requiredString(body.start_time, 'start_time'),
+          startTime: normalizeToolTime(requiredString(body.start_time, 'start_time')),
           resourceId: optionalString(body.resource_id),
           resourceName:
             optionalString(body.resource_name) ??
@@ -75,7 +75,7 @@ export class ToolRouter {
           bookingId: requiredString(body.booking_id, 'booking_id'),
           clientPhone: normalizePhone(requiredString(body.client_phone, 'client_phone')),
           newDate: requiredString(body.new_date, 'new_date'),
-          newStartTime: requiredString(body.new_start_time, 'new_start_time'),
+          newStartTime: normalizeToolTime(requiredString(body.new_start_time, 'new_start_time')),
           resourceId: optionalString(body.resource_id),
           resourceName:
             optionalString(body.resource_name) ??
@@ -85,3 +85,29 @@ export class ToolRouter {
     }
   }
 }
+
+const normalizeToolTime = (value: string) => {
+  const trimmed = value.trim();
+  const isoTime = trimmed.match(/T(\d{2}:\d{2})/);
+  if (isoTime) return isoTime[1];
+
+  const hhmmss = trimmed.match(/^(\d{2}:\d{2}):\d{2}$/);
+  if (hhmmss) return hhmmss[1];
+
+  const twelveHour = trimmed.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i);
+  if (twelveHour) {
+    let hours = Number(twelveHour[1]);
+    const minutes = twelveHour[2] ?? '00';
+    const meridiem = twelveHour[3].toLowerCase();
+    if (meridiem === 'pm' && hours < 12) hours += 12;
+    if (meridiem === 'am' && hours === 12) hours = 0;
+    return `${hours.toString().padStart(2, '0')}:${minutes}`;
+  }
+
+  const hourOnly = trimmed.match(/^(\d{1,2})$/);
+  if (hourOnly) {
+    return `${Number(hourOnly[1]).toString().padStart(2, '0')}:00`;
+  }
+
+  return trimmed;
+};

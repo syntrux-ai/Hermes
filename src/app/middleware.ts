@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import util from 'node:util';
 import type { ErrorRequestHandler, RequestHandler } from 'express';
 import { AppError } from '../shared/errors.js';
 import { logger } from '../shared/logger.js';
@@ -40,7 +41,7 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
       statusCode: err.statusCode,
       code: err.code,
       message: err.message,
-      details: err.details,
+      details: util.inspect(err.details, { depth: 6, breakLength: 160 }),
     });
 
     res.status(err.statusCode).json({

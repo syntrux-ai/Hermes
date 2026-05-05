@@ -48,7 +48,16 @@ export class BookingService {
     const selected = this.assignment.chooseRecommendedSlot(exactSlots, bookingCounts, input.startTime);
 
     if (!selected) {
-      throw conflict('Requested slot is no longer available', { alternatives: slots.slice(0, 5) });
+      throw conflict('Requested slot is no longer available', {
+        requested: {
+          date: input.date,
+          start_time: input.startTime,
+          resource_name: input.resourceName,
+          service: service.name,
+        },
+        available_start_times: [...new Set(slots.map((slot) => slot.start_time))].slice(0, 10),
+        alternatives: slots.slice(0, 5),
+      });
     }
 
     const booking = await this.repository.insertBooking({
@@ -175,7 +184,15 @@ export class BookingService {
     const selected = this.assignment.chooseRecommendedSlot(exactSlots, bookingCounts, input.newStartTime);
 
     if (!selected) {
-      throw conflict('Requested reschedule slot is not available', { alternatives: slots.slice(0, 5) });
+      throw conflict('Requested reschedule slot is not available', {
+        requested: {
+          date: input.newDate,
+          start_time: input.newStartTime,
+          resource_name: input.resourceName,
+        },
+        available_start_times: [...new Set(slots.map((slot) => slot.start_time))].slice(0, 10),
+        alternatives: slots.slice(0, 5),
+      });
     }
 
     const updated = await this.repository.updateBooking(input.bookingId, {
