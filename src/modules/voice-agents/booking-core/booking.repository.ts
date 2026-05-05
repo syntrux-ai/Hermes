@@ -1,12 +1,24 @@
 import { supabase } from '../../../integrations/supabase/supabase.client.js';
 import type { Json } from '../../../integrations/supabase/supabase.types.js';
+import { TtlCache } from '../../../shared/cache.js';
 import { notFound } from '../../../shared/errors.js';
 import { normalizePhone } from '../../../shared/phone.js';
 import type { TenantContext } from '../tenants/tenant.types.js';
 import type { BookingRecord, ResourceRecord, ServiceRecord } from './booking.types.js';
 
+const serviceCache = new TtlCache<ServiceRecord>(5 * 60 * 1000);
+const qualifiedResourcesCache = new TtlCache<ResourceRecord[]>(5 * 60 * 1000);
+const locationHoursCache = new TtlCache<{ open_time: string | null; close_time: string | null; is_closed: boolean } | null>(
+  60 * 1000,
+);
+const resourceHoursCache = new TtlCache<Array<{ resource_id: string; start_time: string; end_time: string }>>(60 * 1000);
+
 export class BookingRepository {
   async findService(context: TenantContext, input: { serviceId?: string; serviceName?: string }): Promise<ServiceRecord> {
+    const cacheKey = `${context.organizationId}:${context.locationId}:${input.serviceId ?? input.serviceName?.toLowerCase()}`;
+    const cached = serviceCache.get(cacheKey);
+    if (cached) return cached;
+
     if (input.serviceId) {
       const { data, error } = await supabase
         .from('services')
@@ -18,7 +30,10 @@ export class BookingRepository {
         .eq('location_services.active', true)
         .maybeSingle();
       if (error) throw error;
-      if (data) return data;
+      if (data) {
+        serviceCache.set(cacheKey, data);
+        return data;
+      }
     }
 
     if (input.serviceName) {
@@ -32,7 +47,10 @@ export class BookingRepository {
         .eq('location_services.active', true)
         .maybeSingle();
       if (error) throw error;
-      if (data) return data;
+      if (data) {
+        serviceCache.set(cacheKey, data);
+        return data;
+      }
 
       const alias = await supabase
         .from('service_aliases')
@@ -44,7 +62,11 @@ export class BookingRepository {
         .eq('services.location_services.active', true)
         .maybeSingle();
       if (alias.error) throw alias.error;
-      if (alias.data) return unwrapRelation(alias.data.services);
+      if (alias.data) {
+        const service = unwrapRelation(alias.data.services);
+        serviceCache.set(cacheKey, service);
+        return service;
+      }
     }
 
     throw notFound('Service was not found for this store');
@@ -95,6 +117,10 @@ export class BookingRepository {
   }
 
   async listQualifiedResources(context: TenantContext, serviceId: string): Promise<ResourceRecord[]> {
+    const cacheKey = `${context.organizationId}:${context.locationId}:${serviceId}`;
+    const cached = qualifiedResourcesCache.get(cacheKey);
+    if (cached) return cached;
+
     const { data, error } = await supabase
       .from('resource_services')
       .select('resources!inner(id, name, role, speciality, active, location_id)')
@@ -106,7 +132,9 @@ export class BookingRepository {
     if (error) throw error;
 
     if (data && data.length > 0) {
-      return data.map((row: { resources: ResourceRecord | ResourceRecord[] }) => unwrapRelation(row.resources));
+      const resources = data.map((row: { resources: ResourceRecord | ResourceRecord[] }) => unwrapRelation(row.resources));
+      qualifiedResourcesCache.set(cacheKey, resources);
+      return resources;
     }
 
     const fallback = await supabase
@@ -117,7 +145,9 @@ export class BookingRepository {
       .eq('active', true);
 
     if (fallback.error) throw fallback.error;
-    return fallback.data ?? [];
+    const resources = fallback.data ?? [];
+    qualifiedResourcesCache.set(cacheKey, resources);
+    return resources;
   }
 
   async isResourceQualified(context: TenantContext, resourceId: string, serviceId: string) {
@@ -134,6 +164,10 @@ export class BookingRepository {
   }
 
   async getLocationHours(context: TenantContext, dayOfWeek: number) {
+    const cacheKey = `${context.locationId}:${dayOfWeek}`;
+    const cached = locationHoursCache.get(cacheKey);
+    if (cached !== undefined) return cached;
+
     const { data, error } = await supabase
       .from('location_hours')
       .select('open_time, close_time, is_closed')
@@ -142,11 +176,16 @@ export class BookingRepository {
       .maybeSingle();
 
     if (error) throw error;
+    locationHoursCache.set(cacheKey, data);
     return data;
   }
 
   async getResourceHours(context: TenantContext, resourceIds: string[], dayOfWeek: number) {
     if (resourceIds.length === 0) return [];
+    const cacheKey = `${context.locationId}:${dayOfWeek}:${[...resourceIds].sort().join(',')}`;
+    const cached = resourceHoursCache.get(cacheKey);
+    if (cached) return cached;
+
     const { data, error } = await supabase
       .from('resource_hours')
       .select('resource_id, start_time, end_time')
@@ -156,7 +195,9 @@ export class BookingRepository {
       .in('resource_id', resourceIds);
 
     if (error) throw error;
-    return data ?? [];
+    const hours = data ?? [];
+    resourceHoursCache.set(cacheKey, hours);
+    return hours;
   }
 
   async getConfirmedBookings(context: TenantContext, date: string, resourceIds: string[]) {

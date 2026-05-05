@@ -1,6 +1,6 @@
 import express from 'express';
 import routes from './routes.js';
-import { errorHandler, notFoundHandler } from './middleware.js';
+import { errorHandler, notFoundHandler, requestLogger } from './middleware.js';
 
 const app = express();
 
@@ -11,6 +11,8 @@ app.use(
     },
   }),
 );
+
+app.use(requestLogger);
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true, service: 'hermes' });

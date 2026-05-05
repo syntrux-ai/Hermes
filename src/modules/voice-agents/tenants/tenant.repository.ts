@@ -1,22 +1,18 @@
 import { assertSupabaseConfigured, supabase } from '../../../integrations/supabase/supabase.client.js';
+import { TtlCache } from '../../../shared/cache.js';
 import { notFound } from '../../../shared/errors.js';
 import type { TenantContext } from './tenant.types.js';
+
+const tenantCache = new TtlCache<TenantContext>(5 * 60 * 1000);
 
 export class TenantRepository {
   async findByProviderAgentId(providerAgentId: string): Promise<TenantContext> {
     assertSupabaseConfigured();
     const normalizedProviderAgentId = providerAgentId.split('?')[0];
-    const exact = await this.findActiveVoiceAgent(providerAgentId);
-    const normalized =
-      exact.data || normalizedProviderAgentId === providerAgentId
-        ? exact
-        : await this.findActiveVoiceAgent(normalizedProviderAgentId);
-    const prefixed =
-      normalized.data || providerAgentId.includes('?')
-        ? normalized
-        : await this.findActiveVoiceAgentByBranchPrefix(providerAgentId);
+    const cached = tenantCache.get(normalizedProviderAgentId);
+    if (cached) return cached;
 
-    const { data, error } = prefixed;
+    const { data, error } = await this.findActiveVoiceAgent(normalizedProviderAgentId);
 
     if (error) throw error;
     const row = data as any;
@@ -27,7 +23,7 @@ export class TenantRepository {
       throw notFound('Voice agent is not configured in Hermes');
     }
 
-    return {
+    const context = {
       organizationId: row.organization_id,
       organizationName: organization.name,
       locationId: row.location_id,
@@ -40,6 +36,10 @@ export class TenantRepository {
       providerAgentId: row.provider_agent_id,
       webhookSecret: row.webhook_secret,
     };
+
+    tenantCache.set(normalizedProviderAgentId, context);
+    tenantCache.set(row.provider_agent_id.split('?')[0], context);
+    return context;
   }
 
   private findActiveVoiceAgent(providerAgentId: string) {
@@ -47,17 +47,7 @@ export class TenantRepository {
       .from('voice_agents')
       .select(voiceAgentSelect)
       .eq('provider', 'elevenlabs')
-      .eq('provider_agent_id', providerAgentId)
-      .eq('active', true)
-      .maybeSingle();
-  }
-
-  private findActiveVoiceAgentByBranchPrefix(providerAgentId: string) {
-    return supabase
-      .from('voice_agents')
-      .select(voiceAgentSelect)
-      .eq('provider', 'elevenlabs')
-      .like('provider_agent_id', `${providerAgentId}?%`)
+      .like('provider_agent_id', `${providerAgentId}%`)
       .eq('active', true)
       .maybeSingle();
   }

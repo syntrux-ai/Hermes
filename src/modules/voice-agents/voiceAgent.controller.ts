@@ -6,6 +6,7 @@ import { ToolRouter } from './toolRouter.js';
 import type { VoiceToolName } from './tool.types.js';
 import { VoiceAgentService } from './voiceAgent.service.js';
 import { InitClientDataService } from './initClientData.service.js';
+import { logger } from '../../shared/logger.js';
 
 export class VoiceAgentController {
   constructor(
@@ -30,7 +31,7 @@ export class VoiceAgentController {
         context = await this.voiceAgentService.resolveContext(req);
         const response = await this.toolRouter.execute(toolName, context, req.body as Record<string, unknown>);
 
-        await this.audit.record({
+        void this.audit.record({
           context,
           providerAgentId,
           toolName,
@@ -38,11 +39,11 @@ export class VoiceAgentController {
           responsePayload: response as Json,
           success: true,
           latencyMs: Date.now() - startedAt,
-        });
+        }).catch((auditError) => logger.warn('voice_tool_audit_failed', auditError));
 
         res.json(response);
       } catch (error) {
-        await this.audit.record({
+        void this.audit.record({
           context,
           providerAgentId,
           toolName,
@@ -50,7 +51,7 @@ export class VoiceAgentController {
           success: false,
           errorMessage: error instanceof Error ? error.message : 'Unknown error',
           latencyMs: Date.now() - startedAt,
-        });
+        }).catch((auditError) => logger.warn('voice_tool_audit_failed', auditError));
 
         throw error;
       }
