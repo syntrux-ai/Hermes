@@ -111,9 +111,35 @@ export class BookingRepository {
         .maybeSingle();
       if (alias.error) throw alias.error;
       if (alias.data) return unwrapRelation(alias.data.resources);
+
+      const prefix = await supabase
+        .from('resources')
+        .select('id, name, role, speciality')
+        .eq('organization_id', context.organizationId)
+        .eq('location_id', context.locationId)
+        .eq('active', true)
+        .ilike('name', `${input.resourceName}%`)
+        .limit(2);
+      if (prefix.error) throw prefix.error;
+      if (prefix.data?.length === 1) return prefix.data[0];
     }
 
     throw notFound('Resource was not found for this store');
+  }
+
+  async maybeFindResource(
+    context: TenantContext,
+    input: { resourceId?: string; resourceName?: string },
+  ): Promise<ResourceRecord | undefined> {
+    try {
+      return await this.findResource(context, input);
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Resource was not found for this store') {
+        return undefined;
+      }
+
+      throw error;
+    }
   }
 
   async listQualifiedResources(context: TenantContext, serviceId: string): Promise<ResourceRecord[]> {

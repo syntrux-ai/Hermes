@@ -155,7 +155,7 @@ export class BookingService {
 
     const requestedResource =
       input.resourceId || input.resourceName
-        ? await this.repository.findResource(input.context, {
+        ? await this.repository.maybeFindResource(input.context, {
             resourceId: input.resourceId,
             resourceName: input.resourceName,
           })
