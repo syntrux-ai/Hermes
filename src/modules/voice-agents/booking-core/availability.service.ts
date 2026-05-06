@@ -1,4 +1,5 @@
 import { assertDate } from '../../../shared/validation.js';
+import { timeToMinutes } from '../../../shared/time.js';
 import type { AvailabilityRequest, AvailabilityResponse, ResourceRecord, SlotOption } from './booking.types.js';
 import { BookingRepository } from './booking.repository.js';
 import { AssignmentService } from './assignment.service.js';
@@ -32,7 +33,7 @@ export class AvailabilityService {
       const qualified = await this.repository.isResourceQualified(request.context, preferredResource.id, service.id);
       if (!qualified) {
         const alternatives = await this.buildSlotsForDate(request, service, undefined);
-        return {
+        return this.withRequestedTime(request, {
           available: false,
           service: service.name,
           date: request.date,
@@ -43,12 +44,12 @@ export class AvailabilityService {
           same_day_alternatives: alternatives.slice(0, 5),
           slots: [],
           auto_assign_recommended: alternatives[0],
-        };
+        });
       }
 
       const preferredSlots = await this.buildSlotsForDate(request, service, [preferredResource]);
       if (preferredSlots.length > 0) {
-        return {
+        return this.withRequestedTime(request, {
           available: true,
           service: service.name,
           date: request.date,
@@ -57,13 +58,13 @@ export class AvailabilityService {
           preferred_resource_name: preferredResource.name,
           slots: preferredSlots,
           auto_assign_recommended: preferredSlots[0],
-        };
+        });
       }
 
       const alternatives = await this.buildSlotsForDate(request, service, undefined, preferredResource.id);
       const nextPreferred = await this.findNextAvailableForPreferredResource(request, service, preferredResource);
 
-      return {
+      return this.withRequestedTime(request, {
         available: alternatives.length > 0,
         service: service.name,
         date: request.date,
@@ -74,7 +75,7 @@ export class AvailabilityService {
         same_day_alternatives: alternatives.slice(0, 5),
         slots: alternatives,
         auto_assign_recommended: alternatives[0],
-      };
+      });
     }
 
     const slots = await this.buildSlotsForDate(request, service, undefined);
@@ -85,14 +86,14 @@ export class AvailabilityService {
     );
     const recommended = this.assignment.chooseRecommendedSlot(slots, bookingCounts);
 
-    return {
+    return this.withRequestedTime(request, {
       available: slots.length > 0,
       service: service.name,
       date: request.date,
       duration_minutes: service.duration_minutes,
       slots,
       auto_assign_recommended: recommended,
-    };
+    });
   }
 
   async getSlotsForBooking(request: AvailabilityRequest): Promise<SlotOption[]> {
@@ -147,6 +148,72 @@ export class AvailabilityService {
       blockedSlots,
       timePreference: request.timePreference,
     });
+  }
+
+  private async withRequestedTime(
+    request: AvailabilityRequest,
+    response: AvailabilityResponse,
+  ): Promise<AvailabilityResponse> {
+    if (!request.requestedStartTime) return response;
+
+    const candidateSlots =
+      response.preferred_resource_available === false ? response.same_day_alternatives ?? response.slots : response.slots;
+    const exactSlots = candidateSlots.filter((slot) => slot.start_time === request.requestedStartTime);
+    const bookingCounts = await this.repository.countBookingsByResource(
+      request.context,
+      request.date,
+      candidateSlots.map((slot) => slot.resource_id),
+    );
+    const recommended = this.assignment.chooseRecommendedSlot(exactSlots, bookingCounts, request.requestedStartTime);
+
+    if (recommended) {
+      return {
+        ...response,
+        available: true,
+        requested_start_time: request.requestedStartTime,
+        requested_time_available: true,
+        slots: [recommended],
+        same_day_alternatives: undefined,
+        auto_assign_recommended: recommended,
+      };
+    }
+
+    const alternatives = this.pickClosestAlternatives(candidateSlots, request.requestedStartTime, bookingCounts);
+
+    return {
+      ...response,
+      available: false,
+      requested_start_time: request.requestedStartTime,
+      requested_time_available: false,
+      slots: [],
+      same_day_alternatives: alternatives,
+      auto_assign_recommended: alternatives[0],
+    };
+  }
+
+  private pickClosestAlternatives(
+    slots: SlotOption[],
+    requestedStartTime: string,
+    bookingCounts: Record<string, number>,
+  ) {
+    const requestedMinutes = timeToMinutes(requestedStartTime);
+    const startTimes = [...new Set(slots.map((slot) => slot.start_time).filter((time) => time !== requestedStartTime))]
+      .sort((a, b) => {
+        const distanceDiff = Math.abs(timeToMinutes(a) - requestedMinutes) - Math.abs(timeToMinutes(b) - requestedMinutes);
+        if (distanceDiff !== 0) return distanceDiff;
+        return timeToMinutes(a) - timeToMinutes(b);
+      })
+      .slice(0, 3);
+
+    return startTimes
+      .map((startTime) =>
+        this.assignment.chooseRecommendedSlot(
+          slots.filter((slot) => slot.start_time === startTime),
+          bookingCounts,
+          startTime,
+        ),
+      )
+      .filter((slot): slot is SlotOption => Boolean(slot));
   }
 }
 

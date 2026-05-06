@@ -22,12 +22,19 @@ export class ToolRouter {
 
     switch (toolName) {
       case 'check-availability': {
+        const requestedStartTime = normalizeOptionalToolTime(
+          optionalString(body.start_time) ??
+            optionalString(body.preferred_time) ??
+            optionalString(body.requested_time) ??
+            optionalString(body.time_preference),
+        );
         const response = await this.availability.checkAvailability({
           context,
           serviceId: optionalString(body.service_id),
           serviceName: optionalString(body.service_name) ?? optionalString(body.service),
           date: requiredString(body.date, 'date'),
-          timePreference: optionalString(body.time_preference),
+          timePreference: requestedStartTime ? undefined : optionalString(body.time_preference),
+          requestedStartTime,
           resourceId: optionalString(body.resource_id),
           resourceName:
             optionalString(body.resource_name) ??
@@ -110,4 +117,10 @@ const normalizeToolTime = (value: string) => {
   }
 
   return trimmed;
+};
+
+const normalizeOptionalToolTime = (value?: string) => {
+  if (!value) return undefined;
+  const normalized = normalizeToolTime(value);
+  return /^\d{2}:\d{2}$/.test(normalized) ? normalized : undefined;
 };

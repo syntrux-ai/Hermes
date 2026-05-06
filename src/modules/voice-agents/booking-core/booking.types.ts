@@ -36,6 +36,7 @@ export type AvailabilityRequest = {
   serviceName?: string;
   date: string;
   timePreference?: string;
+  requestedStartTime?: string;
   resourceId?: string;
   resourceName?: string;
 };
@@ -52,6 +53,8 @@ export type AvailabilityResponse = {
   service: string;
   date: string;
   duration_minutes: number;
+  requested_start_time?: string;
+  requested_time_available?: boolean;
   preferred_resource_available?: boolean;
   preferred_resource_name?: string;
   preferred_resource_next_available?: SlotOption | null;
