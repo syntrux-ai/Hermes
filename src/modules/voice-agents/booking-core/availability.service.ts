@@ -22,7 +22,7 @@ export class AvailabilityService {
 
     const preferredResource =
       request.resourceId || request.resourceName
-        ? await this.repository.maybeFindResource(request.context, {
+        ? await this.repository.findResource(request.context, {
             resourceId: request.resourceId,
             resourceName: request.resourceName,
           })

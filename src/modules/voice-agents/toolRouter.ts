@@ -29,11 +29,10 @@ export class ToolRouter {
           date: requiredString(body.date, 'date'),
           timePreference: optionalString(body.time_preference),
           resourceId: optionalString(body.resource_id),
-          resourceName: normalizeResourceName(
+          resourceName:
             optionalString(body.resource_name) ??
             optionalString(body.technician_name) ??
             optionalString(body.technician),
-          ),
         });
         return this.nailSalon.formatAvailability(response);
       }
@@ -48,11 +47,10 @@ export class ToolRouter {
           date: requiredString(body.date, 'date'),
           startTime: normalizeToolTime(requiredString(body.start_time, 'start_time')),
           resourceId: optionalString(body.resource_id),
-          resourceName: normalizeResourceName(
+          resourceName:
             optionalString(body.resource_name) ??
             optionalString(body.technician_name) ??
             optionalString(body.technician),
-          ),
           notes: optionalString(body.notes),
         });
 
@@ -79,11 +77,10 @@ export class ToolRouter {
           newDate: requiredString(body.new_date, 'new_date'),
           newStartTime: normalizeToolTime(requiredString(body.new_start_time, 'new_start_time')),
           resourceId: optionalString(body.resource_id),
-          resourceName: normalizeResourceName(
+          resourceName:
             optionalString(body.resource_name) ??
             optionalString(body.technician_name) ??
             optionalString(body.technician),
-          ),
         });
     }
   }
@@ -113,27 +110,4 @@ const normalizeToolTime = (value: string) => {
   }
 
   return trimmed;
-};
-
-const normalizeResourceName = (value?: string) => {
-  if (!value) return undefined;
-
-  const normalized = value.trim().toLowerCase();
-  const genericValues = new Set([
-    'any',
-    'anyone',
-    'any technician',
-    'available technician',
-    'whoever',
-    'whoever is available',
-    'no preference',
-    'no preferred technician',
-    'no technician preference',
-    'koi bhi',
-    'koi bhi chalega',
-    'jo available ho',
-    'jo available ho chalega',
-  ]);
-
-  return genericValues.has(normalized) ? undefined : value.trim();
 };
