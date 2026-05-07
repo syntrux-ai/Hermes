@@ -1,9 +1,10 @@
 import express from 'express';
 import routes from './routes.js';
-import { errorHandler, notFoundHandler, requestLogger } from './middleware.js';
+import { assignRequestId, errorHandler, notFoundHandler, requestLogger } from './middleware.js';
 
 const app = express();
 
+app.use(assignRequestId);
 app.use(
   express.json({
     verify: (req, _res, buf) => {

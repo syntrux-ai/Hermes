@@ -1,12 +1,21 @@
 import crypto from 'node:crypto';
 import util from 'node:util';
 import type { ErrorRequestHandler, RequestHandler } from 'express';
-import { AppError } from '../shared/errors.js';
+import { AppError, normalizeError } from '../shared/errors.js';
 import { logger } from '../shared/logger.js';
+
+type RequestWithId = Parameters<RequestHandler>[0] & { requestId?: string };
+
+export const assignRequestId: RequestHandler = (req, res, next) => {
+  const requestId = req.header('x-request-id') ?? req.header('x-vercel-id') ?? crypto.randomUUID();
+  (req as RequestWithId).requestId = requestId;
+  res.setHeader('x-request-id', requestId);
+  next();
+};
 
 export const requestLogger: RequestHandler = (req, res, next) => {
   const startedAt = Date.now();
-  const requestId = req.header('x-vercel-id') ?? crypto.randomUUID();
+  const requestId = (req as RequestWithId).requestId ?? crypto.randomUUID();
   const providerAgentId =
     typeof req.body?.provider_agent_id === 'string'
       ? req.body.provider_agent_id
@@ -30,40 +39,31 @@ export const requestLogger: RequestHandler = (req, res, next) => {
 };
 
 export const notFoundHandler: RequestHandler = (req, _res, next) => {
-  next(new AppError(404, `Route not found: ${req.method} ${req.path}`));
+  next(new AppError(404, `Route not found: ${req.method} ${req.path}`, 'route_not_found'));
 };
 
 export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
-  if (err instanceof AppError) {
-    logger.warn('handled_request_error', {
-      method: req.method,
-      path: req.originalUrl,
-      statusCode: err.statusCode,
-      code: err.code,
-      message: err.message,
-      details: util.inspect(err.details, { depth: 6, breakLength: 160 }),
-    });
+  const requestId = (req as RequestWithId).requestId;
+  const appError = normalizeError(err);
+  const logLevel = appError.statusCode >= 500 ? 'error' : 'warn';
 
-    res.status(err.statusCode).json({
-      error: {
-        code: err.code,
-        message: err.message,
-        details: err.details,
-      },
-    });
-    return;
-  }
-
-  logger.error('unhandled_request_error', {
+  logger[logLevel]('request_error', {
+    requestId,
     method: req.method,
     path: req.originalUrl,
-    error: serializeError(err),
+    statusCode: appError.statusCode,
+    code: appError.code,
+    message: appError.message,
+    details: util.inspect(appError.details, { depth: 6, breakLength: 160 }),
+    cause: err instanceof AppError ? undefined : serializeError(err),
   });
-  res.status(500).json({
+
+  res.status(appError.statusCode).json({
     error: {
-      code: 'internal_error',
-      message: 'Unexpected server error',
-      details: process.env.NODE_ENV === 'production' ? undefined : serializeError(err),
+      code: appError.code,
+      message: appError.message,
+      details: appError.details,
+      request_id: requestId,
     },
   });
 };
