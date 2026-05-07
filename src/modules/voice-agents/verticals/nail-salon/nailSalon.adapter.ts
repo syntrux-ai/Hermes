@@ -7,7 +7,6 @@ export class NailSalonAdapter {
       response.requested_time_available === false
         ? compactAlternatives(response.same_day_alternatives ?? [])
         : compactAlternatives(response.slots, recommended);
-    const slots = response.requested_time_available === false ? alternatives : recommended ? [recommended, ...alternatives] : alternatives;
 
     return {
       available: response.available,
@@ -19,9 +18,6 @@ export class NailSalonAdapter {
       preferred_resource_available: response.preferred_resource_available,
       preferred_resource_name: response.preferred_resource_name,
       preferred_resource_next_available: response.preferred_resource_next_available,
-      same_day_alternatives: alternatives,
-      slots,
-      auto_assign_recommended: recommended,
       recommended,
       alternatives,
       resource_label: 'technician',
@@ -71,4 +67,8 @@ const buildAvailabilityMessage = (
   return `${serviceDate} is not available.`;
 };
 
-const formatTimes = (slots: SlotOption[]) => slots.map((slot) => slot.start_time).join(' or ');
+const formatTimes = (slots: SlotOption[]) => {
+  const times = slots.map((slot) => slot.start_time);
+  if (times.length <= 2) return times.join(' or ');
+  return `${times.slice(0, -1).join(', ')}, or ${times.at(-1)}`;
+};
