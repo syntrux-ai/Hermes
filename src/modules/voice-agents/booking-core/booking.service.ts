@@ -89,23 +89,32 @@ export class BookingService {
       start_time: booking.start_time.slice(0, 5),
       end_time: booking.end_time.slice(0, 5),
       price: service.price,
+      message: `Booked ${service.name} on ${booking.booking_date} at ${booking.start_time.slice(0, 5)} with ${selected.resource_name}.`,
     };
   }
 
   async findBookings(input: { context: CreateBookingInput['context']; clientPhone: string; status?: string }) {
     const status = input.status ?? 'confirmed';
     const bookings = await this.repository.findBookingsByPhone(input.context, input.clientPhone, status);
+    const bookingSummaries = bookings.map((booking) => ({
+      booking_id: booking.id,
+      service: booking.services.name,
+      resource_name: booking.resources.name,
+      date: booking.booking_date,
+      start_time: booking.start_time.slice(0, 5),
+      end_time: booking.end_time.slice(0, 5),
+      status: booking.status,
+    }));
+    const primaryBooking = bookingSummaries[0];
 
     return {
-      bookings: bookings.map((booking) => ({
-        booking_id: booking.id,
-        service: booking.services.name,
-        resource_name: booking.resources.name,
-        date: booking.booking_date,
-        start_time: booking.start_time.slice(0, 5),
-        end_time: booking.end_time.slice(0, 5),
-        status: booking.status,
-      })),
+      has_bookings: bookingSummaries.length > 0,
+      booking_count: bookingSummaries.length,
+      booking: primaryBooking ?? null,
+      bookings: bookingSummaries,
+      message: primaryBooking
+        ? `Found ${primaryBooking.service} on ${primaryBooking.date} at ${primaryBooking.start_time} with ${primaryBooking.resource_name}.`
+        : 'No matching bookings found.',
     };
   }
 
@@ -220,6 +229,7 @@ export class BookingService {
       new_end_time: updated.end_time.slice(0, 5),
       resource_name: selected.resource_name,
       service: booking.services.name,
+      message: `Rescheduled ${booking.services.name} from ${booking.booking_date} at ${booking.start_time.slice(0, 5)} to ${updated.booking_date} at ${updated.start_time.slice(0, 5)} with ${selected.resource_name}.`,
     };
   }
 
