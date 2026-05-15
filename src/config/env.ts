@@ -20,6 +20,7 @@ export const env = {
   supabaseUrl: process.env.SUPABASE_URL ?? '',
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? '',
   elevenLabsWebhookToleranceSeconds: optionalInt(process.env.ELEVENLABS_WEBHOOK_TOLERANCE_SECONDS, 300),
+  elevenLabsPostCallWebhookSecret: process.env.ELEVENLABS_POST_CALL_WEBHOOK_SECRET ?? '',
   elevenLabsSignatureRequired: optionalBoolean(
     process.env.ELEVENLABS_SIGNATURE_REQUIRED,
     process.env.NODE_ENV === 'production',

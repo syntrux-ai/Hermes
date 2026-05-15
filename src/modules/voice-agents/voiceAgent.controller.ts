@@ -7,6 +7,7 @@ import type { VoiceToolName } from './tool.types.js';
 import { VoiceAgentService } from './voiceAgent.service.js';
 import { InitClientDataService } from './initClientData.service.js';
 import { logger } from '../../shared/logger.js';
+import { PostCallService } from './postCall.service.js';
 
 export class VoiceAgentController {
   constructor(
@@ -14,6 +15,7 @@ export class VoiceAgentController {
     private readonly toolRouter = new ToolRouter(),
     private readonly audit = new AuditService(),
     private readonly initClientData = new InitClientDataService(),
+    private readonly postCall = new PostCallService(),
   ) {}
 
   handleTool(toolName: VoiceToolName) {
@@ -61,6 +63,13 @@ export class VoiceAgentController {
   handleInitClientData() {
     return async (req: Request, res: Response) => {
       const response = await this.initClientData.buildResponse(req);
+      res.json(response);
+    };
+  }
+
+  handlePostCall() {
+    return async (req: Request, res: Response) => {
+      const response = await this.postCall.handle(req);
       res.json(response);
     };
   }
